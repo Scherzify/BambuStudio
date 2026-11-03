@@ -10,6 +10,7 @@
 #include "PrintConfig.hpp"
 #include "GCode/AvoidCrossingPerimeters.hpp"
 #include "GCode/GCodeEditor.hpp"
+#include "GCode/ExtrusionProcessor.hpp"
 #include "GCode/RetractWhenCrossingPerimeters.hpp"
 #include "GCode/SpiralVase.hpp"
 #include "GCode/ToolOrdering.hpp"
@@ -169,7 +170,7 @@ public:
 class GCode {
 public:
     GCode() :
-    	m_origin(Vec2d::Zero()),
+        m_origin(Vec2d::Zero()),
         m_enable_loop_clipping(true),
         m_enable_cooling_markers(false),
         m_enable_extrusion_role_markers(false),
@@ -251,10 +252,10 @@ public:
     struct LayerToPrint
     {
         LayerToPrint() : object_layer(nullptr), support_layer(nullptr), original_object(nullptr) {}
-        const Layer* 		object_layer;
+        const Layer*            object_layer;
         const SupportLayer* support_layer;
         const PrintObject*  original_object; //BBS: used for shared object logic
-        const Layer* 		layer()   const
+        const Layer*            layer()   const
         {
             if (object_layer != nullptr)
                 return object_layer;
@@ -265,7 +266,7 @@ public:
             return nullptr;
         }
 
-        const PrintObject* 	object()   const
+        const PrintObject*      object()   const
         {
             return (this->layer() != nullptr) ? this->layer()->object() : nullptr;
         }
@@ -326,7 +327,7 @@ private:
     // When out_empty_layer_warning is provided, the empty-layer warning text is written there instead
     // of being pushed to the Print step immediately, so the caller can aggregate warnings from all
     // objects into a single notification.
-    static std::vector<LayerToPrint>        		                   collect_layers_to_print(const PrintObject &object, std::string *out_empty_layer_warning = nullptr);
+    static std::vector<LayerToPrint>                                       collect_layers_to_print(const PrintObject &object, std::string *out_empty_layer_warning = nullptr);
     static std::vector<std::pair<coordf_t, std::vector<LayerToPrint>>> collect_layers_to_print(const Print &print);
 
     struct LayerResult {
@@ -373,10 +374,10 @@ private:
         const Print                     &print,
         // Set of object & print layers of the same PrintObject and with the same print_z.
         const std::vector<LayerToPrint> &layers,
-        const LayerTools  				&layer_tools,
+        const LayerTools                                &layer_tools,
         const bool                       last_layer,
-		// Pairs of PrintObject index and its instance index.
-		const std::vector<const PrintInstance*> *ordering,
+                // Pairs of PrintObject index and its instance index.
+                const std::vector<const PrintInstance*> *ordering,
         // idientiy timelapse pos
         const int                        most_used_extruder,
         // If set to size_t(-1), then print all copies of all objects.
@@ -452,18 +453,18 @@ private:
         struct Island
         {
             struct Region {
-            	// Non-owned references to LayerRegion::perimeters::entities
-            	// std::vector<const ExtrusionEntity*> would be better here, but there is no way in C++ to convert from std::vector<T*> std::vector<const T*> without copying.
+                // Non-owned references to LayerRegion::perimeters::entities
+                // std::vector<const ExtrusionEntity*> would be better here, but there is no way in C++ to convert from std::vector<T*> std::vector<const T*> without copying.
                 ExtrusionEntitiesPtr perimeters;
-            	// Non-owned references to LayerRegion::fills::entities
+                // Non-owned references to LayerRegion::fills::entities
                 ExtrusionEntitiesPtr infills;
                 std::vector<const WipingExtrusions::ExtruderPerCopy*> infills_overrides;
                 std::vector<const WipingExtrusions::ExtruderPerCopy*> perimeters_overrides;
 
-	            enum Type {
-	            	PERIMETERS,
-	            	INFILL,
-	            };
+                    enum Type {
+                        PERIMETERS,
+                        INFILL,
+                    };
 
                 // Appends perimeter/infill entities and writes don't indices of those that are not to be extruder as part of perimeter/infill wiping
                 void append(const Type type, const ExtrusionEntityCollection* eec, const WipingExtrusions::ExtruderPerCopy* copy_extruders);
@@ -478,30 +479,30 @@ private:
         std::vector<Island>         islands;
     };
 
-	struct InstanceToPrint
-	{
-		InstanceToPrint(ObjectByExtruder &object_by_extruder, size_t layer_id, const PrintObject &print_object, size_t instance_id, size_t label_object_id) :
-			object_by_extruder(object_by_extruder), layer_id(layer_id), print_object(print_object), instance_id(instance_id), label_object_id(label_object_id) {}
+        struct InstanceToPrint
+        {
+                InstanceToPrint(ObjectByExtruder &object_by_extruder, size_t layer_id, const PrintObject &print_object, size_t instance_id, size_t label_object_id) :
+                        object_by_extruder(object_by_extruder), layer_id(layer_id), print_object(print_object), instance_id(instance_id), label_object_id(label_object_id) {}
 
-		// Repository
-		ObjectByExtruder		&object_by_extruder;
-		// Index into std::vector<LayerToPrint>, which contains Object and Support layers for the current print_z, collected for a single object, or for possibly multiple objects with multiple instances.
-		const size_t       		 layer_id;
-		const PrintObject 		&print_object;
-		// Instance idx of the copy of a print object.
-		const size_t			 instance_id;
+                // Repository
+                ObjectByExtruder                &object_by_extruder;
+                // Index into std::vector<LayerToPrint>, which contains Object and Support layers for the current print_z, collected for a single object, or for possibly multiple objects with multiple instances.
+                const size_t                     layer_id;
+                const PrintObject               &print_object;
+                // Instance idx of the copy of a print object.
+                const size_t                     instance_id;
         //BBS: Unique id to label object to support skiping during printing
         const size_t             label_object_id;
-	};
+        };
 
-	std::vector<InstanceToPrint> sort_print_object_instances(
-		std::vector<ObjectByExtruder> 					&objects_by_extruder,
-		// Object and Support layers for the current print_z, collected for a single object, or for possibly multiple objects with multiple instances.
-		const std::vector<LayerToPrint> 				&layers,
-		// Ordering must be defined for normal (non-sequential print).
-		const std::vector<const PrintInstance*>     	*ordering,
-		// For sequential print, the instance of the object to be printing has to be defined.
-		const size_t                     				 single_object_instance_idx);
+        std::vector<InstanceToPrint> sort_print_object_instances(
+                std::vector<ObjectByExtruder>                                   &objects_by_extruder,
+                // Object and Support layers for the current print_z, collected for a single object, or for possibly multiple objects with multiple instances.
+                const std::vector<LayerToPrint>                                 &layers,
+                // Ordering must be defined for normal (non-sequential print).
+                const std::vector<const PrintInstance*>         *ordering,
+                // For sequential print, the instance of the object to be printing has to be defined.
+                const size_t                                                     single_object_instance_idx);
 
     std::string     extrude_perimeters(const Print &print, const std::vector<ObjectByExtruder::Island::Region> &by_region);
     std::string     extrude_infill(const Print &print, const std::vector<ObjectByExtruder::Island::Region> &by_region, bool ironing);
@@ -533,6 +534,8 @@ private:
     std::set<ObjectID>              m_objSupportsWithBrim; // indicates the objs' supports with brim
     // Cache for custom seam enforcers/blockers for each layer.
     SeamPlacer                          m_seam_placer;
+    // Dynamic per-point overhang slowdown (port of OrcaSlicer's "Slowdown for overhang").
+    ExtrusionQualityEstimator           m_extrusion_quality_estimator;
 
     /* Origin of print coordinates expressed in unscaled G-code coordinates.
        This affects the input arguments supplied to the extrude*() and travel_to()
