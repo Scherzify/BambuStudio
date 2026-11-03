@@ -1,0 +1,99 @@
+name: Build Bambu Studio (ORCA Overhang Port)
+
+# Baut Bambu Studio v02.08.02.61 mit dem portierten dynamischen Überhang-Slowdown
+# (Port von OrcaSlicers ExtrusionQualityEstimator) für Windows x64.
+#
+# Verwendung:
+#   1. Bambu-Studio-Fork anlegen (oder eigenes Repo aus dem Tag v02.08.02.61 erstellen)
+#   2. Diesen Port anwenden (git apply 0001-*.patch oder Dateien aus dem ZIP kopieren)
+#   3. Diese Datei nach .github/workflows/ legen, committen und pushen
+#   4. Im Tab "Actions" den Workflow "Build Bambu Studio (ORCA Overhang Port)" starten
+#   5. Fertige Windows-Build als Artefakt herunterladen
+
+on:
+  workflow_dispatch: # manueller Start über den "Actions"-Tab
+  push:
+    branches:
+      - master
+      - main
+    paths:
+      - 'deps/**'
+      - 'src/**'
+      - '**/CMakeLists.txt'
+      - 'version.inc'
+      - '.github/workflows/build_orca_overhang_port.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Generator der Visual-Studio-Toolchain.
+  # "Visual Studio 18 2026" entspricht dem offiziellen Bambu-Studio-CI (windows-latest-Runner).
+  # Für VS2022 auf älteren Runner-Images: "Visual Studio 17 2022" eintragen.
+  VS_GENERATOR: "Visual Studio 18 2026"
+  # Windows-SDK-Pfad wie im offiziellen Bambu-Studio-CI. Falls der Runner ein anderes
+  # SDK nutzt, den Wert anpassen (Verzeichnis "C:/Program Files (x86)/Windows Kits/10/Include").
+  WIN10SDK_PATH: "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22000.0"
+
+jobs:
+  windows-build:
+    name: Windows x64
+    runs-on: windows-latest
+    steps:
+      - name: Checkout (inkl. LFS)
+        uses: actions/checkout@v6
+        with:
+          lfs: 'true'
+
+      - name: Setup MSVC
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build-Tools installieren
+        shell: pwsh
+        run: |
+          choco install strawberryperl pkgconfiglite -y --no-progress
+
+      - name: Abhängigkeits-Cache wiederherstellen
+        id: cache_deps
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/deps/build/BambuStudio_dep
+          key: windows-orca-overhang-port-deps-${{ hashFiles('deps/**') }}
+
+      - name: Abhängigkeiten bauen (Boost, wxWidgets, TBB, OpenVDB, ...)
+        if: steps.cache_deps.outputs.cache-hit != 'true'
+        shell: pwsh
+        working-directory: ${{ github.workspace }}
+        run: |
+          New-Item -ItemType Directory -Force -Path deps\build\BambuStudio_dep | Out-Null
+          cd deps\build
+          cmake .. -G "$env:VS_GENERATOR" -A x64 -DDESTDIR="./BambuStudio_dep" -DCMAKE_BUILD_TYPE=Release -DDEP_DEBUG=OFF
+          msbuild /m ALL_BUILD.vcxproj
+
+      - name: Slicer bauen
+        shell: pwsh
+        working-directory: ${{ github.workspace }}
+        run: |
+          New-Item -ItemType Directory -Force -Path build | Out-Null
+          cd build
+          cmake .. -G "$env:VS_GENERATOR" -A x64 -DBBL_RELEASE_TO_PUBLIC=1 -DBBL_INTERNAL_TESTING=0 `
+            -DCMAKE_PREFIX_PATH="$env:GITHUB_WORKSPACE\deps\build\BambuStudio_dep\usr\local" `
+            -DCMAKE_INSTALL_PREFIX="$env:GITHUB_WORKSPACE\install-dir" `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DWIN10SDK_PATH="$env:WIN10SDK_PATH"
+          cmake --build . --target install --config Release -- -m
+
+      - name: Portable App packen
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "$env:GITHUB_WORKSPACE\install-dir\*" `
+            -DestinationPath "$env:GITHUB_WORKSPACE\BambuStudio-ORCA-OverhangPort-win64.zip"
+
+      - name: Artefakt hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: BambuStudio-ORCA-OverhangPort-win64
+          path: ${{ github.workspace }}/BambuStudio-ORCA-OverhangPort-win64.zip
+          retention-days: 14
+          if-no-files-found: error
