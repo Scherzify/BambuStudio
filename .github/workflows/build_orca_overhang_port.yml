@@ -59,7 +59,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/deps/build/BambuStudio_dep
-          key: windows-orca-overhang-port-deps-${{ hashFiles('deps/**') }}
+          key: windows-orca-overhang-port-deps-v02.08.02.61
+          restore-keys: windows-orca-overhang-port-deps-
 
       - name: Abhängigkeiten bauen (Boost, wxWidgets, TBB, OpenVDB, ...)
         if: steps.cache_deps.outputs.cache-hit != 'true'
